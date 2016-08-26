@@ -741,6 +741,10 @@ static int sdl_control_update(SDLKey keystate)
         {
             bitmap.viewport.x = (config.overscan & 2) ? 14 : -48;
         }
+        else if ((system_hw == SYSTEM_GGMS) && !config.gg_extra)
+        {
+            bitmap.viewport.x = (config.overscan & 2) ? 14 : -8;
+        }
         else
         {
             bitmap.viewport.x = (config.overscan & 2) * 7;
