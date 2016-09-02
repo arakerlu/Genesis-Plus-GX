@@ -1134,7 +1134,7 @@ static void check_variables(void)
 
   if (reinit)
   {
-    audio_init(44100, snd.frame_rate);
+    audio_init(44100, vdp_pal ? pal_fps : ntsc_fps);
     memcpy(temp, sram.sram, sizeof(temp));
     system_init();
     system_reset();
