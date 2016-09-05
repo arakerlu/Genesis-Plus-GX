@@ -699,8 +699,7 @@ static void extract_directory(char *buf, const char *path, size_t size)
 
 static double calculate_pixel_aspect_ratio(void)
 {
-  uint8 is_h40 = bitmap.viewport.w == 320; // Could be read directly from the register as well.
-
+  
   if (config.aspect_ratio == 0)
   {
     if ((system_hw == SYSTEM_GG || system_hw == SYSTEM_GGMS) && config.overscan == 0 && config.gg_extra == 0)
@@ -709,20 +708,26 @@ static double calculate_pixel_aspect_ratio(void)
     }
   }
 
-  double dotrate = system_clock;
-  double videosamplerate = vdp_pal ? 14750000.0 : 135000000.0 / 11.0;
+  uint8 is_h40 = bitmap.viewport.w == 320; // Could be read directly from the register as well.
+
+  double dotrate;
+  double videosamplerate;
   if (config.aspect_ratio == 1) // Force NTSC PAR
   {
-    dotrate = MCLOCK_NTSC;
+    dotrate = MCLOCK_NTSC / (is_h40 ? 8.0 : 10.0);
     videosamplerate = 135000000.0 / 11.0;
   }
   else if (config.aspect_ratio == 2) // Force PAL PAR
   {
-    dotrate = MCLOCK_PAL;
+    dotrate = MCLOCK_PAL / (is_h40 ? 8.0 : 10.0);
     videosamplerate = 14750000.0;
   }
-  dotrate /= (is_h40 ? 8.0 : 10.0);  
-
+  else
+  {
+    dotrate = system_clock / (is_h40 ? 8.0 : 10.0);
+    videosamplerate = vdp_pal ? 14750000.0 : 135000000.0 / 11.0;
+  }
+  
   if (!(config.render && interlaced))
   { 
     videosamplerate /= 2.0;
