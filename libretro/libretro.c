@@ -56,6 +56,7 @@ char CART_BRAM[256];
 
 static int vwidth;
 static int vheight;
+static double vaspect_ratio;
 
 static uint32_t brm_crc[2];
 static uint8_t brm_format[0x40] =
@@ -479,6 +480,7 @@ static void config_default(void)
 
    /* video options */
    config.overscan = 0;
+   config.aspect_ratio = 0;
    config.gg_extra = 0;
    config.ntsc     = 0;
    config.lcd      = 0;
@@ -695,10 +697,52 @@ static void extract_directory(char *buf, const char *path, size_t size)
       buf[0] = '\0';
 }
 
+static double calculate_pixel_aspect_ratio(void)
+{
+  uint8 is_h40 = bitmap.viewport.w == 320; // Could be read directly from the register as well.
+
+  if (config.aspect_ratio == 0)
+  {
+    if ((system_hw == SYSTEM_GG || system_hw == SYSTEM_GGMS) && config.overscan == 0 && config.gg_extra == 0)
+    {
+      return 6.0 / 5.0;
+    }
+  }
+
+  double dotrate = system_clock;
+  double videosamplerate = vdp_pal ? 14750000.0 : 135000000.0 / 11.0;
+  if (config.aspect_ratio == 1) // Force NTSC PAR
+  {
+    dotrate = MCLOCK_NTSC;
+    videosamplerate = 135000000.0 / 11.0;
+  }
+  else if (config.aspect_ratio == 2) // Force PAL PAR
+  {
+    dotrate = MCLOCK_PAL;
+    videosamplerate = 14750000.0;
+  }
+  dotrate /= (is_h40 ? 8.0 : 10.0);  
+
+  if (!(config.render && interlaced))
+  { 
+    videosamplerate /= 2.0;
+  }
+
+  return videosamplerate / dotrate;
+}
+
+static double calculate_aspect_ratio(void)
+{
+  double pixel_aspect_ratio = calculate_pixel_aspect_ratio();
+  double display_aspect_ratio = vwidth * pixel_aspect_ratio / vheight;
+  return display_aspect_ratio;
+}
+
 static bool update_viewport(void)
 {
   int ow = vwidth;
   int oh = vheight;
+  double oar = vaspect_ratio;
 
   vwidth  = bitmap.viewport.w + (bitmap.viewport.x * 2);
   vheight = bitmap.viewport.h + (bitmap.viewport.y * 2);
@@ -715,8 +759,8 @@ static bool update_viewport(void)
    {
       vheight = vheight * 2;
    }
-
-   return ((ow != vwidth) || (oh != vheight));
+   vaspect_ratio = calculate_aspect_ratio();
+   return ((ow != vwidth) || (oh != vheight) || (oar != vaspect_ratio));
 }
 
 static void check_variables(void)
@@ -895,6 +939,8 @@ static void check_variables(void)
           /* force overscan change */
           bitmap.viewport.changed = 3;
 
+          vaspect_ratio = calculate_aspect_ratio();
+
           /* reinitialize libretro audio/video timings */
           retro_get_system_av_info(&info);
           environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &info);
@@ -1045,6 +1091,22 @@ static void check_variables(void)
       config.gg_extra = 1;
     if (orig_value != config.gg_extra)
       update_viewports = true;
+  }
+
+  var.key = "genesis_plus_gx_aspect_ratio";
+  environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var);
+  {
+    orig_value = config.aspect_ratio;
+    if (strcmp(var.value, "NTSC PAR") == 0)
+      config.aspect_ratio = 1;
+    else if (strcmp(var.value, "PAL PAR") == 0)
+      config.aspect_ratio = 2;
+    else
+      config.aspect_ratio = 0;
+    if (orig_value != config.aspect_ratio)
+    {
+      update_viewports = true;
+    }
   }
 
   var.key = "genesis_plus_gx_render";
@@ -1448,6 +1510,7 @@ void retro_set_environment(retro_environment_t cb)
       { "genesis_plus_gx_lcd_filter", "LCD Ghosting filter; disabled|enabled" },
       { "genesis_plus_gx_overscan", "Borders; disabled|top/bottom|left/right|full" },
       { "genesis_plus_gx_gg_extra", "Game Gear extended screen; disabled|enabled" },
+      { "genesis_plus_gx_aspect_ratio", "Core-provided aspect ratio; auto|NTSC PAR|PAL PAR" },
       { "genesis_plus_gx_render", "Interlaced mode 2 output; single field|double field" },
       { "genesis_plus_gx_gun_cursor", "Show Lightgun crosshair; no|yes" },
       { "genesis_plus_gx_invert_mouse", "Invert Mouse Y-axis; no|yes" },
@@ -1635,7 +1698,7 @@ void retro_get_system_av_info(struct retro_system_av_info *info)
    info->geometry.base_height   = vheight;
    info->geometry.max_width     = 720;
    info->geometry.max_height    = 576;
-   info->geometry.aspect_ratio  = 4.0 / 3.0;
+   info->geometry.aspect_ratio  = vaspect_ratio;
    info->timing.fps             = (double)(system_clock) / (double)lines_per_frame / (double)MCYCLES_PER_LINE;
    info->timing.sample_rate     = 44100;
 }
