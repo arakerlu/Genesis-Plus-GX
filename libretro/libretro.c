@@ -56,7 +56,6 @@ char CART_BRAM[256];
 
 static int vwidth;
 static int vheight;
-static float vaspect_ratio;
 
 static uint32_t brm_crc[2];
 static uint8_t brm_format[0x40] =
@@ -480,7 +479,6 @@ static void config_default(void)
 
    /* video options */
    config.overscan = 0;
-   config.aspect_ratio = 1;
    config.gg_extra = 0;
    config.ntsc     = 0;
    config.lcd      = 0;
@@ -697,106 +695,13 @@ static void extract_directory(char *buf, const char *path, size_t size)
       buf[0] = '\0';
 }
 
-static float calculate_aspect_ratio(void)
-{
-  uint8 aspect_ratio_mode = config.aspect_ratio;
-
-  if (aspect_ratio_mode == 1) // 4:3
-  {
-    return 4.0 / 3.0;
-  }
-
-  if (aspect_ratio_mode == 0)
-  {
-    if (system_hw == SYSTEM_GG || system_hw == SYSTEM_GGMS)
-    {
-      aspect_ratio_mode = 4;
-    }
-    else
-    {
-      aspect_ratio_mode = vdp_pal ? 3 : 2;
-    }
-  }
-  
-  double pixel_aspect_ratio = 1.0;
-
-  uint8 is_h40 = bitmap.viewport.w == 320; // Could be read directly from the register as well.
-
-  if (aspect_ratio_mode == 2) // NTSC PAR
-  {
-    /* Resolve the pixel aspect ratio for NTSC clean aperture.
-    Principles for the calculations are taken from the websites below:
-    http://wiki.nesdev.com/w/index.php/Overscan#NTSC
-    http://lurkertech.com/lg/video-systems/#480i_sampling
-
-    Dot rate is calculated from MCLOCK frequency.
-    On H32 mode it's MCLOCK/10 and on H40 mode it's (approximately) MCLOCK/8.
-    There seems to be some caveats in the H40 mode where the dot rate can
-    actually vary (see comments on hvc.h), but approximating the rate to
-    constant MCLOCK/8 is enough.
-    */
-
-    /* The exact pixel aspect for NTSC in clean aperture is calculated from the dot rate of VDP and
-    the duration on scanline in NTSC. Based on these facts the PAR could be resolved with the code below.
-
-    double scanlinetime = 640.0 / (135000000.0 / 11.0);
-    double dotrate = MCLOCK_NTSC / (is_h40 ? 8.0 : 10.0);
-    int lines = 240;
-    double pixel_aspect_ratio = (lines / (dotrate * scanlinetime)) * (4.0 / 3.0);
-
-    The values yielded are (as rational representation):
-    H40: 7200000/7874999 (~ 0.91428583)
-    H32: 9000000/7874999 (~ 1.14285729)
-
-    The well known constants for NTSC PAR, 32/35 in H40 and 8/7 in H32, are so close to the exact values
-    (the decimal representations are equal up to the sixth decimal), that they can well be used.
-    H40: 32/35 (~ 0.91428571)
-    H32: 8/7 (~ 1.14285714)
-    */
-    pixel_aspect_ratio = is_h40 ? (32.0 / 35.0) : (8.0 / 7.0);
-  }
-  else if (aspect_ratio_mode == 3) // PAL PAR
-  {
-    /* Similarity, the exact pixel aspect ratio for PAL in clean aperture could be resolved with the code below.
-
-    double scanlinetime = 768.0 / 14750000.0;
-    double pixelrate = MCLOCK_PAL / (is_h40 ? 8.0 : 10.0);
-    int lines = 288;
-    double pixel_aspect_ratio = (lines / (pixelrate * scanlinetime)) * (4.0 / 3.0);
-
-    The values yielded are (as rational representation)
-    H40: 1843750/1662607 (~ 1.10895118)
-    H32: 4609375/3325214 (~ 1.38618897)
-
-    There're no similar well known constants for PAL PAR to approximate these, and actually there doesn't
-    even exist rational number represtation with a low numerator and denominator that's very close to the exact values.
-    The closest approximations with max 2 digit numerator and denominator.
-    H40: 51/46 (~ 1.10869565) or 61/55 (~ 1.10909091)
-    H32: 79/57 (~ 1.38596491) or 61/44 (~ 1.38636363)
-    And the closest approximations with max 3 digit numerator and denominator.
-    H40: 285/257 (~ 1.10894941) or 743/670 (~ 1.10895522)
-    H32: 883/637 (~ 1.38618524) or 542/391 (~ 1.38618926)
-    */
-    pixel_aspect_ratio = is_h40 ? (61.0 / 55.0) : (79.0 / 57.0);
-  }
-  else if (aspect_ratio_mode == 4) // 6:5 PAR
-  {
-    pixel_aspect_ratio = 6.0 / 5.0;
-  }
-
-  float display_aspect_ratio = vwidth * pixel_aspect_ratio / vheight;
-  return display_aspect_ratio;
-}
-
 static bool update_viewport(void)
 {
   int ow = vwidth;
   int oh = vheight;
-  float oar = vaspect_ratio;
 
   vwidth  = bitmap.viewport.w + (bitmap.viewport.x * 2);
   vheight = bitmap.viewport.h + (bitmap.viewport.y * 2);
-  vaspect_ratio = calculate_aspect_ratio();
 
    if (config.ntsc)
    {
@@ -811,7 +716,7 @@ static bool update_viewport(void)
       vheight = vheight * 2;
    }
 
-   return ((ow != vwidth) || (oh != vheight) || (oar != vaspect_ratio));
+   return ((ow != vwidth) || (oh != vheight));
 }
 
 static void check_variables(void)
@@ -1142,28 +1047,6 @@ static void check_variables(void)
       update_viewports = true;
   }
 
-  var.key = "genesis_plus_gx_aspect_ratio";
-  environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var);
-  {
-    orig_value = config.aspect_ratio;
-    if (strcmp(var.value, "4:3") == 0)
-      config.aspect_ratio = 1;
-    else if (strcmp(var.value, "NTSC PAR") == 0)
-      config.aspect_ratio = 2;
-    else if (strcmp(var.value, "PAL PAR") == 0)
-      config.aspect_ratio = 3;
-    else if (strcmp(var.value, "6:5 PAR") == 0)
-      config.aspect_ratio = 4;
-    else if (strcmp(var.value, "1:1 PAR") == 0)
-      config.aspect_ratio = 5;
-    else
-      config.aspect_ratio = 0;
-    if (orig_value != config.aspect_ratio)
-    {
-      update_viewports = true;
-    }
-  }
-
   var.key = "genesis_plus_gx_render";
   environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var);
   {
@@ -1208,8 +1091,6 @@ static void check_variables(void)
     bitmap.viewport.changed = 3;
     if ((system_hw == SYSTEM_GG) && !config.gg_extra)
       bitmap.viewport.x = (config.overscan & 2) ? 14 : -48;
-    else if ((system_hw == SYSTEM_GGMS) && !config.gg_extra)
-      bitmap.viewport.x = (config.overscan & 2) ? 14 : -8;
     else
       bitmap.viewport.x = (config.overscan & 2) * 7;
   }
@@ -1567,7 +1448,6 @@ void retro_set_environment(retro_environment_t cb)
       { "genesis_plus_gx_lcd_filter", "LCD Ghosting filter; disabled|enabled" },
       { "genesis_plus_gx_overscan", "Borders; disabled|top/bottom|left/right|full" },
       { "genesis_plus_gx_gg_extra", "Game Gear extended screen; disabled|enabled" },
-      { "genesis_plus_gx_aspect_ratio", "Core-provided aspect ratio; auto|4:3|NTSC PAR|PAL PAR|6:5 PAR|1:1 PAR" },
       { "genesis_plus_gx_render", "Interlaced mode 2 output; single field|double field" },
       { "genesis_plus_gx_gun_cursor", "Show Lightgun crosshair; no|yes" },
       { "genesis_plus_gx_invert_mouse", "Invert Mouse Y-axis; no|yes" },
@@ -1755,7 +1635,7 @@ void retro_get_system_av_info(struct retro_system_av_info *info)
    info->geometry.base_height   = vheight;
    info->geometry.max_width     = 720;
    info->geometry.max_height    = 576;
-   info->geometry.aspect_ratio  = vaspect_ratio;
+   info->geometry.aspect_ratio  = 4.0 / 3.0;
    info->timing.fps             = (double)(system_clock) / (double)lines_per_frame / (double)MCYCLES_PER_LINE;
    info->timing.sample_rate     = 44100;
 }
