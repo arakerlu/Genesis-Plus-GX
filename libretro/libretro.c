@@ -710,33 +710,26 @@ static double calculate_pixel_aspect_ratio(void)
 
   uint8 is_h40 = bitmap.viewport.w == 320; // Could be read directly from the register as well.
 
-  double dotrate;
+  double dotrate = system_clock / (is_h40 ? 8.0 : 10.0);
   double videosamplerate;
+  
   if (config.aspect_ratio == 1) // Force NTSC PAR
   {
-    dotrate = MCLOCK_NTSC / (is_h40 ? 8.0 : 10.0);
     videosamplerate = 135000000.0 / 11.0;
   }
   else if (config.aspect_ratio == 2) // Force PAL PAR
   {
-    dotrate = MCLOCK_PAL / (is_h40 ? 8.0 : 10.0);
     videosamplerate = 14750000.0;
   }
   else
   {
-    dotrate = system_clock / (is_h40 ? 8.0 : 10.0);
     videosamplerate = vdp_pal ? 14750000.0 : 135000000.0 / 11.0;
   }
   
-  if (!(config.render && interlaced))
-  { 
-    videosamplerate /= 2.0;
-  }
-
-  return videosamplerate / dotrate;
+  return videosamplerate / 2.0 / dotrate;
 }
 
-static double calculate_aspect_ratio(void)
+static double calculate_display_aspect_ratio(void)
 {
   double pixel_aspect_ratio = calculate_pixel_aspect_ratio();
   double display_aspect_ratio = vwidth * pixel_aspect_ratio / vheight;
@@ -751,6 +744,7 @@ static bool update_viewport(void)
 
   vwidth  = bitmap.viewport.w + (bitmap.viewport.x * 2);
   vheight = bitmap.viewport.h + (bitmap.viewport.y * 2);
+  vaspect_ratio = calculate_display_aspect_ratio();
 
    if (config.ntsc)
    {
@@ -764,7 +758,6 @@ static bool update_viewport(void)
    {
       vheight = vheight * 2;
    }
-   vaspect_ratio = calculate_aspect_ratio();
    return ((ow != vwidth) || (oh != vheight) || (oar != vaspect_ratio));
 }
 
@@ -943,8 +936,6 @@ static void check_variables(void)
 
           /* force overscan change */
           bitmap.viewport.changed = 3;
-
-          vaspect_ratio = calculate_aspect_ratio();
 
           /* reinitialize libretro audio/video timings */
           retro_get_system_av_info(&info);
