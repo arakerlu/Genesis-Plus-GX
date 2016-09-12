@@ -765,6 +765,7 @@ static void check_variables(void)
 {
   unsigned orig_value;
   bool update_viewports = false;
+  bool update_av = false;
   bool reinit = false;
   struct retro_variable var = {0};
   struct retro_system_av_info info;
@@ -934,12 +935,7 @@ static void check_variables(void)
               break;
           }
 
-          /* force overscan change */
-          bitmap.viewport.changed = 3;
-
-          /* reinitialize libretro audio/video timings */
-          retro_get_system_av_info(&info);
-          environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &info);
+          update_av = true;
         }
       }
     }
@@ -1074,7 +1070,7 @@ static void check_variables(void)
     else if (strcmp(var.value, "full") == 0)
       config.overscan = 3;
     if (orig_value != config.overscan)
-      update_viewports = true;
+      update_av = true;
   }
 
   var.key = "genesis_plus_gx_gg_extra";
@@ -1086,7 +1082,7 @@ static void check_variables(void)
     else if (strcmp(var.value, "enabled") == 0)
       config.gg_extra = 1;
     if (orig_value != config.gg_extra)
-      update_viewports = true;
+      update_av = true;
   }
 
   var.key = "genesis_plus_gx_aspect_ratio";
@@ -1100,9 +1096,7 @@ static void check_variables(void)
     else
       config.aspect_ratio = 0;
     if (orig_value != config.aspect_ratio)
-    {
-      update_viewports = true;
-    }
+      update_av = true;
   }
 
   var.key = "genesis_plus_gx_render";
@@ -1142,11 +1136,12 @@ static void check_variables(void)
     system_init();
     system_reset();
     memcpy(sram.sram, temp, sizeof(temp));
+    update_av = true;
   }
 
-  if (update_viewports)
+  if (update_viewports || update_av)
   {
-    bitmap.viewport.changed = 3;
+    bitmap.viewport.changed = update_av ? 11 : 3;
     if ((system_hw == SYSTEM_GG) && !config.gg_extra)
       bitmap.viewport.x = (config.overscan & 2) ? 14 : -48;
     else
@@ -2101,8 +2096,16 @@ void retro_run(void)
       {
          struct retro_system_av_info info;
          retro_get_system_av_info(&info);
-         environ_cb(RETRO_ENVIRONMENT_SET_GEOMETRY, &info.geometry);
+         if (bitmap.viewport.changed & 8)
+         {
+           environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &info);
+         }
+         else
+         {
+           environ_cb(RETRO_ENVIRONMENT_SET_GEOMETRY, &info.geometry);
+         }
       }
+      bitmap.viewport.changed &= ~8;
    }
 
    if (config.gun_cursor)
