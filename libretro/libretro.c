@@ -765,7 +765,6 @@ static void check_variables(void)
 {
   unsigned orig_value;
   bool update_viewports = false;
-  bool update_av = false;
   bool reinit = false;
   struct retro_variable var = {0};
   struct retro_system_av_info info;
@@ -935,7 +934,7 @@ static void check_variables(void)
               break;
           }
 
-          update_av = true;
+          update_viewports = true;
         }
       }
     }
@@ -1070,7 +1069,7 @@ static void check_variables(void)
     else if (strcmp(var.value, "full") == 0)
       config.overscan = 3;
     if (orig_value != config.overscan)
-      update_av = true;
+      update_viewports = true;
   }
 
   var.key = "genesis_plus_gx_gg_extra";
@@ -1082,7 +1081,7 @@ static void check_variables(void)
     else if (strcmp(var.value, "enabled") == 0)
       config.gg_extra = 1;
     if (orig_value != config.gg_extra)
-      update_av = true;
+      update_viewports = true;
   }
 
   var.key = "genesis_plus_gx_aspect_ratio";
@@ -1096,7 +1095,7 @@ static void check_variables(void)
     else
       config.aspect_ratio = 0;
     if (orig_value != config.aspect_ratio)
-      update_av = true;
+      update_viewports = true;
   }
 
   var.key = "genesis_plus_gx_render";
@@ -1136,12 +1135,12 @@ static void check_variables(void)
     system_init();
     system_reset();
     memcpy(sram.sram, temp, sizeof(temp));
-    update_av = true;
+    update_viewports = true;
   }
 
-  if (update_viewports || update_av)
+  if (update_viewports)
   {
-    bitmap.viewport.changed = update_av ? 11 : 3;
+    bitmap.viewport.changed = 11;
     if ((system_hw == SYSTEM_GG) && !config.gg_extra)
       bitmap.viewport.x = (config.overscan & 2) ? 14 : -48;
     else
