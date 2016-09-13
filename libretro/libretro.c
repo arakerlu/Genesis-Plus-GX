@@ -697,14 +697,13 @@ static void extract_directory(char *buf, const char *path, size_t size)
       buf[0] = '\0';
 }
 
-static double calculate_pixel_aspect_ratio(void)
+static double calculate_display_aspect_ratio(void)
 {
-  
   if (config.aspect_ratio == 0)
   {
     if ((system_hw == SYSTEM_GG || system_hw == SYSTEM_GGMS) && config.overscan == 0 && config.gg_extra == 0)
     {
-      return 6.0 / 5.0;
+      return (6.0 / 5.0) * ((double)vwidth / (double)vheight);
     }
   }
 
@@ -712,7 +711,7 @@ static double calculate_pixel_aspect_ratio(void)
 
   double dotrate = system_clock / (is_h40 ? 8.0 : 10.0);
   double videosamplerate;
-  
+
   if (config.aspect_ratio == 1) // Force NTSC PAR
   {
     videosamplerate = 135000000.0 / 11.0;
@@ -725,15 +724,8 @@ static double calculate_pixel_aspect_ratio(void)
   {
     videosamplerate = vdp_pal ? 14750000.0 : 135000000.0 / 11.0;
   }
-  
-  return videosamplerate / 2.0 / dotrate;
-}
 
-static double calculate_display_aspect_ratio(void)
-{
-  double pixel_aspect_ratio = calculate_pixel_aspect_ratio();
-  double display_aspect_ratio = vwidth * pixel_aspect_ratio / vheight;
-  return display_aspect_ratio;
+  return (videosamplerate / dotrate) * ((double)vwidth / ((double)vheight * 2.0));
 }
 
 static bool update_viewport(void)
@@ -2088,7 +2080,7 @@ void retro_run(void)
    else
       system_frame_sms(0);
 
-   if (bitmap.viewport.changed & 1)
+   if (bitmap.viewport.changed & 9)
    {
       bitmap.viewport.changed &= ~1;
       if (update_viewport())
