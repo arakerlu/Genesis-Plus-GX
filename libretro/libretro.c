@@ -2083,20 +2083,22 @@ void retro_run(void)
    if (bitmap.viewport.changed & 9)
    {
       bitmap.viewport.changed &= ~1;
+      struct retro_system_av_info info;
+      retro_get_system_av_info(&info);
       if (update_viewport())
       {
-         struct retro_system_av_info info;
-         retro_get_system_av_info(&info);
-         if (bitmap.viewport.changed & 8)
-         {
-           environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &info);
-         }
-         else
+         /* If 4th bit is set, then in that case SET_SYSTEM_AV_INFO is done later,
+            thus there's no need to do SET_GEOMETRY here. */
+         if (!(bitmap.viewport.changed & 8)) 
          {
            environ_cb(RETRO_ENVIRONMENT_SET_GEOMETRY, &info.geometry);
          }
       }
-      bitmap.viewport.changed &= ~8;
+      if (bitmap.viewport.changed & 8)
+      {
+        environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &info);
+        bitmap.viewport.changed &= ~8;
+      }
    }
 
    if (config.gun_cursor)
