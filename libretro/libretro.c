@@ -2083,21 +2083,20 @@ void retro_run(void)
    if (bitmap.viewport.changed & 9)
    {
       bitmap.viewport.changed &= ~1;
-      struct retro_system_av_info info;
-      retro_get_system_av_info(&info);
-      if (update_viewport())
-      {
-         /* If 4th bit is set, then in that case SET_SYSTEM_AV_INFO is done later,
-            thus there's no need to do SET_GEOMETRY here. */
-         if (!(bitmap.viewport.changed & 8)) 
-         {
-           environ_cb(RETRO_ENVIRONMENT_SET_GEOMETRY, &info.geometry);
-         }
-      }
+      bool geometry_updated = update_viewport();
+      
       if (bitmap.viewport.changed & 8)
       {
+        bitmap.viewport.changed &= ~8; 
+        struct retro_system_av_info info;
+        retro_get_system_av_info(&info);
         environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &info);
-        bitmap.viewport.changed &= ~8;
+      }
+      else if (geometry_updated)
+      {
+        struct retro_system_av_info info;
+        retro_get_system_av_info(&info);
+        environ_cb(RETRO_ENVIRONMENT_SET_GEOMETRY, &info.geometry);
       }
    }
 
