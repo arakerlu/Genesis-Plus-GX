@@ -707,16 +707,16 @@ static double calculate_display_aspect_ratio(void)
     }
   }
 
-  uint8 is_h40 = bitmap.viewport.w == 320; // Could be read directly from the register as well.
+  bool is_h40 = bitmap.viewport.w == 320; /* Could be read directly from the register as well. */
 
   double dotrate = system_clock / (is_h40 ? 8.0 : 10.0);
   double videosamplerate;
 
-  if (config.aspect_ratio == 1) // Force NTSC PAR
+  if (config.aspect_ratio == 1) /* Force NTSC PAR */
   {
     videosamplerate = 135000000.0 / 11.0;
   }
-  else if (config.aspect_ratio == 2) // Force PAL PAR
+  else if (config.aspect_ratio == 2) /* Force PAL PAR */
   {
     videosamplerate = 14750000.0;
   }
@@ -2082,13 +2082,12 @@ void retro_run(void)
 
    if (bitmap.viewport.changed & 9)
    {
-      bitmap.viewport.changed &= ~1;
       bool geometry_updated = update_viewport();
-      
+      bitmap.viewport.changed &= ~1;
       if (bitmap.viewport.changed & 8)
       {
-        bitmap.viewport.changed &= ~8; 
         struct retro_system_av_info info;
+        bitmap.viewport.changed &= ~8; 
         retro_get_system_av_info(&info);
         environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &info);
       }
