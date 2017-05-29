@@ -348,6 +348,63 @@ void system_reset(void)
   audio_reset();
 }
 
+void update_viewport_location(void)
+{
+  /* update horizontal location */
+  if (config.overscan & 2)
+  {
+    uint8 is_h40 = bitmap.viewport.w == 320;
+
+    if (vdp_pal)
+    {
+      bitmap.viewport.x = is_h40 ? 13 : 11;
+    }
+    else
+    {  
+      bitmap.viewport.x = is_h40 ? 15 : 12; 
+    }
+    
+  }
+  else
+  {
+    if ((system_hw == SYSTEM_GG) && !config.gg_extra)
+    {
+      /* Display area reduced to 160x144 if overscan is disabled */
+      bitmap.viewport.x = -48;
+    }
+    else if (system_hw == SYSTEM_GGMS && !config.gg_extra)
+    {
+      /*
+      In order to display GGMS mode games on the GG screen the leftmost and rightmost 8 pixels of the SMS screen are discarded.
+      This effectively reduces the display area to 240x192 if overscan is disabled.
+      */
+      bitmap.viewport.x = -8;
+    }
+    else
+    {
+      bitmap.viewport.x = 0;
+    }
+  }
+
+  /* update vertical location */
+  if (config.overscan & 1)
+  {
+    bitmap.viewport.y = (240 + 48 * vdp_pal - bitmap.viewport.h) / 2;
+  }
+  else
+  {
+    if ((system_hw == SYSTEM_GG) && !config.gg_extra)
+    {
+      /* Display area reduced to 160x144 */
+      bitmap.viewport.y = (144 - bitmap.viewport.h) / 2;
+    }
+    else
+    {
+      bitmap.viewport.y = 0;
+    }
+  }
+}
+
 void system_frame_gen(int do_skip)
 {
   /* line counters */
@@ -407,24 +464,23 @@ void system_frame_gen(int do_skip)
       {
         /* 240 active lines */
         bitmap.viewport.h = 240;
-        bitmap.viewport.y = (config.overscan & 1) * 24 * vdp_pal;
       }
       else
       {
         /* 224 active lines */
         bitmap.viewport.h = 224;
-        bitmap.viewport.y = (config.overscan & 1) * (8 + (24 * vdp_pal));
       }
     }
     else
     {
       /* Mode 4 (192 active lines) */
       bitmap.viewport.h = 192;
-      bitmap.viewport.y = (config.overscan & 1) * 24 * (vdp_pal + 1);
     }
 
     /* active screen width */
     bitmap.viewport.w = 256 + ((reg[12] & 0x01) << 6);
+
+    update_viewport_location();
 
     /* check viewport changes */
     if (bitmap.viewport.h != bitmap.viewport.oh)
@@ -762,24 +818,23 @@ void system_frame_scd(int do_skip)
       {
         /* 240 active lines */
         bitmap.viewport.h = 240;
-        bitmap.viewport.y = (config.overscan & 1) * 24 * vdp_pal;
       }
       else
       {
         /* 224 active lines */
         bitmap.viewport.h = 224;
-        bitmap.viewport.y = (config.overscan & 1) * (8 + (24 * vdp_pal));
       }
     }
     else
     {
       /* Mode 4 (192 active lines) */
       bitmap.viewport.h = 192;
-      bitmap.viewport.y = (config.overscan & 1) * 24 * (vdp_pal + 1);
     }
 
     /* active screen width */
     bitmap.viewport.w = 256 + ((reg[12] & 0x01) << 6);
+
+    update_viewport_location();
 
     /* check viewport changes */
     if (bitmap.viewport.h != bitmap.viewport.oh)
@@ -1100,19 +1155,16 @@ void system_frame_sms(int do_skip)
         {
           /* 240 active lines */
           bitmap.viewport.h = 240;
-          bitmap.viewport.y = (config.overscan & 1) * 24 * vdp_pal;
         }
         else
         {
           /* 224 active lines */
           bitmap.viewport.h = 224;
-          bitmap.viewport.y = (config.overscan & 1) * (8 + (24 * vdp_pal));
         }
       }
       else
       {
         bitmap.viewport.h = 192;
-        bitmap.viewport.y = (config.overscan & 1) * 24 * (vdp_pal + 1);
       }
     }
     else
@@ -1133,28 +1185,12 @@ void system_frame_sms(int do_skip)
       {
         bitmap.viewport.h = 192;
       }
-
-      /* update vertical overscan */
-      if (config.overscan & 1)
-      {
-        bitmap.viewport.y = (240 + 48*vdp_pal - bitmap.viewport.h) >> 1;
-      }
-      else
-      {
-        if ((system_hw == SYSTEM_GG) && !config.gg_extra)
-        {
-          /* Display area reduced to 160x144 */
-          bitmap.viewport.y = (144 - bitmap.viewport.h) / 2;
-        }
-        else
-        {
-          bitmap.viewport.y = 0;
-        }
-      }
     }
 
     /* active screen width */
     bitmap.viewport.w = 256 + ((reg[12] & 0x01) << 6);
+
+    update_viewport_location();
 
     /* check viewport changes */
     if (bitmap.viewport.h != bitmap.viewport.oh)

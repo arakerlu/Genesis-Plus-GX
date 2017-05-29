@@ -116,6 +116,7 @@ extern void system_reset(void);
 extern void system_frame_gen(int do_skip);
 extern void system_frame_scd(int do_skip);
 extern void system_frame_sms(int do_skip);
+extern void update_viewport_location(void);
 
 #endif /* _SYSTEM_H_ */
 

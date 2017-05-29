@@ -306,28 +306,7 @@ void vdp_reset(void)
   /* default sprite pixel width */
   max_sprite_pixels = 256;
 
-  /* default overscan area */
-  if ((system_hw == SYSTEM_GG) && !config.gg_extra)
-  {
-    /* Display area reduced to 160x144 if overscan is disabled */
-    bitmap.viewport.x = (config.overscan & 2) ? 14 : -48;
-    bitmap.viewport.y = (config.overscan & 1) ? (24 * (vdp_pal + 1)) : -24;
-  }
-  else if (system_hw == SYSTEM_GGMS && !config.gg_extra)
-  {
-	  /* 
-    In order to display GGMS mode games on the GG screen the leftmost and rightmost 8 pixels of the SMS screen are discarded.
-
-    This effectively reduces the display area to 240x192 if overscan is disabled.
-    */
-	  bitmap.viewport.x = (config.overscan & 2) ? 14 : -8;
-	  bitmap.viewport.y = (config.overscan & 1) * 24 * (vdp_pal + 1);
-  }
-  else
-  {
-    bitmap.viewport.x = (config.overscan & 2) * 7;
-    bitmap.viewport.y = (config.overscan & 1) * 24 * (vdp_pal + 1);
-  }
+  update_viewport_location();
 
   /* default rendering mode */
   update_bg_pattern_cache = update_bg_pattern_cache_m4;
